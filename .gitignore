@@ -1,0 +1,17 @@
+# Environment — NEVER commit real credentials
+.env
+
+# Docker volumes (if mapped locally)
+n8n_data/
+comfyui_output/
+comfyui_models/
+anythingllm_storage/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp

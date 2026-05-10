@@ -1,0 +1,116 @@
+version: "3.9"
+
+# ============================================================
+# CS + Engineering Resume Dataset Generator — Local Stack
+# ============================================================
+# Services:
+#   n8n          → workflow orchestrator  (port 5678)
+#   anythingllm  → local LLM server       (port 3001)
+#   comfyui      → image generation       (port 8188)
+#
+# Usage:
+#   cp .env.example .env          # fill in your values
+#   docker compose up -d
+# ============================================================
+
+services:
+
+  # ----------------------------------------------------------
+  # n8n — workflow engine
+  # ----------------------------------------------------------
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: resume_n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=${N8N_HOST:-localhost}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=${N8N_PROTOCOL:-http}
+      - WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://localhost:5678}
+      - GENERIC_TIMEZONE=${TIMEZONE:-Asia/Manila}
+      - N8N_BASIC_AUTH_ACTIVE=${N8N_BASIC_AUTH_ACTIVE:-false}
+      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD:-changeme}
+      # Persist encryption key so credentials survive restarts
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY:-changeme_random_32chars}
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./workflow:/home/node/.n8n/workflow-imports   # optional import folder
+    networks:
+      - resume_net
+    depends_on:
+      - anythingllm
+
+  # ----------------------------------------------------------
+  # AnythingLLM — local LLM inference server
+  # Docs: https://docs.anythingllm.com/installation/self-hosted/docker
+  # ----------------------------------------------------------
+  anythingllm:
+    image: mintplexlabs/anythingllm:latest
+    container_name: resume_anythingllm
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - STORAGE_DIR=/app/server/storage
+      - JWT_SECRET=${ANYTHINGLLM_JWT_SECRET:-changeme_jwt_secret}
+      - SERVER_PORT=3001
+    volumes:
+      - anythingllm_storage:/app/server/storage
+    networks:
+      - resume_net
+    # GPU passthrough (uncomment if you have an NVIDIA GPU + nvidia-container-toolkit)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  # ----------------------------------------------------------
+  # ComfyUI — Stable Diffusion image generation
+  # Docs: https://github.com/comfyanonymous/ComfyUI
+  # Note: image requires a CUDA-capable GPU for reasonable speed.
+  #       CPU-only is possible but very slow.
+  # ----------------------------------------------------------
+  comfyui:
+    image: ghcr.io/ai-dock/comfyui:latest-cuda
+    container_name: resume_comfyui
+    restart: unless-stopped
+    ports:
+      - "8188:8188"
+    environment:
+      - WEB_ENABLE_AUTH=false
+      - COMFYUI_PORT=8188
+    volumes:
+      - comfyui_models:/opt/ComfyUI/models
+      - comfyui_output:/opt/ComfyUI/output
+    networks:
+      - resume_net
+    # GPU passthrough
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+# ----------------------------------------------------------
+# Volumes
+# ----------------------------------------------------------
+volumes:
+  n8n_data:
+  anythingllm_storage:
+  comfyui_models:
+  comfyui_output:
+
+# ----------------------------------------------------------
+# Network
+# ----------------------------------------------------------
+networks:
+  resume_net:
+    driver: bridge
