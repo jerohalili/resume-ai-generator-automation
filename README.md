@@ -1,5 +1,7 @@
 # CS + Engineering Resume Dataset Generator (v4)
 
+![Project Banner](./assets/banner.png)
+
 An **n8n automation workflow** that generates synthetic, photorealistic, demographically diverse resume datasets for CS and Engineering roles — complete with AI-written content, AI-generated headshots, formatted PDFs, and structured JSON uploads to Google Drive.
 
 ---

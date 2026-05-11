@@ -1,0 +1,965 @@
+{
+  "name": "CS+Engineering Resume Dataset Generator v4",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Reactive Resume v5 API Reference\nhttps://docs.rxresu.me/api-reference/resumes/create-a-new-resume\nhttps://docs.rxresu.me/api-reference/resumes/patch-resume-data\nhttps://docs.rxresu.me/api-reference/resume-export/export-resume-as-pdf\n\n## Endpoints used:\nPOST https://rxresu.me/api/openapi/resumes\n  \u2192 body: {name, slug, tags[], withSampleData}\n  \u2192 returns: resume ID string\n\nPATCH https://rxresu.me/api/openapi/resumes/{id}\n  \u2192 body: {operations: [{op, path, value}]}\n  \u2192 JSON Patch: replace /data/basics, /data/summary, /data/sections/...\n\nGET https://rxresu.me/api/openapi/resume-export/{id}\n  \u2192 returns: URL string of generated PDF",
+        "height": 380,
+        "width": 572
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        9472,
+        1808
+      ],
+      "id": "83902356-bd84-4eeb-8172-18da6c23cc0a",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.imageUrl }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "imageBinary"
+            }
+          }
+        }
+      },
+      "id": "18b70a80-e801-4fb5-9393-334dd894228a",
+      "name": "HTTP: Download ComfyUI Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        9744,
+        2592
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const historyData = $input.first().json;\nconst prev = $('Wait 150s for Image').item.json;\nconst promptId = prev.prompt_id;\n\nif (!historyData || !historyData[promptId]) {\n  throw new Error(`No history entry found for prompt ${promptId}. Image may still be generating.`);\n}\n\nconst outputs = historyData[promptId].outputs;\nif (!outputs) throw new Error(`No outputs in history for prompt ${promptId}`);\n\nlet imageFilename = null;\nfor (const output of Object.values(outputs)) {\n  if (output.images && output.images.length > 0) {\n    imageFilename = output.images[0].filename;\n    break;\n  }\n}\n\nif (!imageFilename) throw new Error('No image filename found in ComfyUI history');\n\nconst profile = $('Assemble Full Resume').item.json;\n\nreturn [{ json: {\n  ...profile,\n  imageFilename,\n  imageUrl: `http://YOUR_COMFYUI_URL/view?filename=${imageFilename}`\n}}];"
+      },
+      "id": "493a124d-5f1f-487d-8051-be758c4f8f79",
+      "name": "Parse ComfyUI History",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        9504,
+        2592
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=http://YOUR_COMFYUI_URL/history/{{ $json.prompt_id }}",
+        "options": {}
+      },
+      "id": "567a060f-b659-406b-be8d-c1096b8288ec",
+      "name": "HTTP: Get ComfyUI History",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        9248,
+        2592
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://YOUR_COMFYUI_URL/prompt",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"prompt\": {\n    \"9\": { \"inputs\": { \"filename_prefix\": \"resume_head\", \"images\": [\"10\", 0] }, \"class_type\": \"SaveImage\" },\n    \"1\": { \"inputs\": { \"unet_name\": \"z_image_turbo_bf16.safetensors\", \"weight_dtype\": \"default\" }, \"class_type\": \"UNETLoader\" },\n    \"2\": { \"inputs\": { \"clip_name\": \"qwen_3_4b.safetensors\", \"type\": \"lumina2\", \"device\": \"default\" }, \"class_type\": \"CLIPLoader\" },\n    \"3\": { \"inputs\": { \"vae_name\": \"ae.safetensors\" }, \"class_type\": \"VAELoader\" },\n    \"4\": { \"inputs\": { \"text\": \"Professional LinkedIn headshot portrait of a {{ $json.ageDesc }} {{ $json.ethnicityPrompt }} {{ $json.gender === 'female' ? 'woman' : 'man' }}, {{ $json.candidateTitle }}, business formal attire, natural skin texture, authentic appearance, soft studio lighting, neutral light grey background, sharp focus, photorealistic DSLR photo, 8k\", \"clip\": [\"2\", 0] }, \"class_type\": \"CLIPTextEncode\" },\n    \"5\": { \"inputs\": { \"text\": \"watermark, text, blurry, low quality\", \"clip\": [\"2\", 0] }, \"class_type\": \"CLIPTextEncode\" },\n    \"6\": { \"inputs\": { \"width\": 1024, \"height\": 1024, \"batch_size\": 1 }, \"class_type\": \"EmptySD3LatentImage\" },\n    \"7\": { \"inputs\": { \"shift\": 3, \"model\": [\"1\", 0] }, \"class_type\": \"ModelSamplingAuraFlow\" },\n    \"8\": { \"inputs\": { \"seed\": {{ Math.floor(Math.random()*999999999) }}, \"steps\": 12, \"cfg\": 1, \"sampler_name\": \"res_multistep\", \"scheduler\": \"simple\", \"denoise\": 1, \"model\": [\"7\", 0], \"positive\": [\"4\", 0], \"negative\": [\"5\", 0], \"latent_image\": [\"6\", 0] }, \"class_type\": \"KSampler\" },\n    \"10\": { \"inputs\": { \"samples\": [\"8\", 0], \"vae\": [\"3\", 0] }, \"class_type\": \"VAEDecode\" }\n  }\n}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "0345eee5-44f6-4e9e-ab1f-84e7fc68fda5",
+      "name": "ComfyUI: Generate Headshot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        8768,
+        2592
+      ]
+    },
+    {
+      "parameters": {
+        "inputDataFieldName": "jsonBinary",
+        "name": "={{ $('Prep for Drive').item.json.jsonFileName }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "MyDrive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $('Prep for Drive').item.json.driveFolder === 'CS' ? 'YOUR_CS_DRIVE_FOLDER_ID' : 'YOUR_ENGINEERING_DRIVE_FOLDER_ID' }}",
+          "mode": "list"
+        },
+        "options": {}
+      },
+      "id": "e7649929-794e-4f40-8008-e531bb4cab68",
+      "name": "Drive: Upload JSON",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        10640,
+        2944
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "AOBq35YAnonFywPD",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "inputDataFieldName": "pdfBinary",
+        "name": "={{ $json.pdfFileName }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "MyDrive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $json.driveFolder === 'CS' ? 'YOUR_CS_DRIVE_FOLDER_ID' : 'YOUR_ENGINEERING_DRIVE_FOLDER_ID' }}",
+          "mode": "list"
+        },
+        "options": {}
+      },
+      "id": "9e5a19f6-1742-4b32-96ab-4f08a0a46fb6",
+      "name": "Drive: Upload PDF",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        10640,
+        2784
+      ],
+      "alwaysOutputData": false,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "AOBq35YAnonFywPD",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\nconst meta = $('Parse Create + Build Patch').item.json;\n\n// 1. Generate filenames\nconst safeName = (meta.candidateName || 'resume').replace(/[^a-zA-Z0-9_-]/g, '_');\nconst ts = new Date().toISOString().slice(0,10);\nconst pdfFileName = `${safeName}_${ts}.pdf`;\nconst jsonFileName = `${safeName}_${ts}.json`;\n\n// 2. Determine Drive folder\nconst driveFolder = (meta.category || '').toUpperCase().startsWith('CS') ? 'CS' : 'Engineering';\n\n// 3. Prepare JSON content\nconst jsonContent = JSON.stringify(meta.resumeData || {}, null, 2);\n\n// 4. Return both binary objects\n// Note: We use 'pdfBinary' for the PDF and 'jsonBinary' for the JSON\nreturn [{\n  json: {\n    ...meta,\n    pdfFileName,\n    jsonFileName,\n    driveFolder,\n  },\n  binary: {\n    // Keep the PDF from the previous node (HTTP: Download PDF)\n    pdfBinary: item.binary.pdfBinary,\n    // Create the new JSON binary\n    jsonBinary: await helpers.prepareBinaryData(Buffer.from(jsonContent), jsonFileName, 'application/json')\n  }\n}];"
+      },
+      "id": "850e1473-f138-4059-858f-79dd77e75a7c",
+      "name": "Prep for Drive",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        10448,
+        2864
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ typeof $json === \"string\" ? $json : $json.url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "pdfBinary"
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "3632c42d-2012-49a0-8f99-e62a5f1f6162",
+      "name": "HTTP: Download PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        10208,
+        2864
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://rxresu.me/api/openapi/resumes/{{ $('Parse Create + Build Patch').item.json.resumeId }}/pdf",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "YOUR_REACTIVE_RESUME_API_KEY"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "pdfBinary"
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "d0d853d1-333e-4baa-8f92-2d64a3a394af",
+      "name": "RR: Export PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        9968,
+        2864
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 15
+      },
+      "id": "71cf48a3-6666-4133-8a21-7e1a93fcbf66",
+      "name": "Wait 15s (printer)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        9728,
+        2864
+      ],
+      "webhookId": "400b7dbb-8796-4027-9acb-7ca67240c212"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://rxresu.me/api/openapi/resumes/{{ $json.resumeId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "YOUR_REACTIVE_RESUME_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.patchPayload) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "5000f3bf-4043-4b94-87b1-220f3ff24eee",
+      "name": "RR: Patch Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        9488,
+        2864
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst res  = $input.first().json;\nconst prev = $('Build RR Payload').item.json;\n\nconst resumeId = res.data || res.id || (typeof res === 'string' ? res.replace(/\"/g, '') : null);\n\nif (!resumeId || typeof resumeId !== 'string' || resumeId.length < 5) {\n  throw new Error('RR Create: unexpected response \u2014 ' + JSON.stringify(res));\n}\n\nconst rd = prev.resumeData;\n\nconst template = prev.template || 'onyx';\n\n// Theme was randomly chosen per-candidate in Define 2 Candidate Profiles\nconst theme = prev.theme || {\n  primary: 'rgba(26, 86, 219, 1)',\n  background: 'rgba(255, 255, 255, 1)',\n  text: 'rgba(26, 26, 46, 1)'\n};\n\nconst patchOps = [\n  { op: 'replace', path: '/metadata/template',      value: template },\n  { op: 'add',     path: '/metadata/design/colors', value: theme },\n  { op: 'add',     path: '/basics',                 value: rd.basics },\n  { op: 'add',     path: '/summary',                value: rd.summary },\n  { op: 'add',     path: '/sections/experience',    value: rd.sections.experience },\n  { op: 'add',     path: '/sections/education',     value: rd.sections.education },\n  { op: 'add',     path: '/sections/skills',        value: rd.sections.skills },\n  { op: 'add',     path: '/sections/projects',      value: rd.sections.projects },\n  { op: 'add',     path: '/sections/certifications',value: rd.sections.certifications }\n];\n\n// Inject headshot photo via public Google Drive URL\nif (prev.photoUrl) {\n  patchOps.push({\n    op: 'add',\n    path: '/picture',\n    value: {\n      url: prev.photoUrl,\n      hidden: false,\n      size: 128,\n      rotation: 0,\n      aspectRatio: 1,\n      borderRadius: 5,\n      borderColor: 'rgba(0, 0, 0, 1)',\n      borderWidth: 0,\n      shadowColor: 'rgba(0, 0, 0, 0)',\n      shadowWidth: 0\n    }\n  });\n}\n\nreturn [{\n  json: {\n    ...prev,\n    resumeId,\n    patchPayload: { operations: patchOps }\n  }\n}];\n"
+      },
+      "id": "aeb96bc8-cad0-4fa2-9447-543d4c6e3ab0",
+      "name": "Parse Create + Build Patch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        9248,
+        2864
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://rxresu.me/api/openapi/resumes",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "YOUR_REACTIVE_RESUME_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.rrCreatePayload) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "ac28bfc2-565b-467b-a208-93e5b7bf43b2",
+      "name": "RR: Create Resume",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        9008,
+        2864
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build the payload for Reactive Resume CREATE API\n// POST /api/openapi/resumes \u2192 returns resume ID\nconst data = $input.first().json;\nconst slug = data.slug || data.candidateName.toLowerCase().replace(/\\s+/g, '-') + '-' + Date.now();\n\nreturn [{\n  json: {\n    ...data,\n    rrCreatePayload: {\n      name:           data.candidateName,\n      slug:           slug,\n      tags:           [data.category || 'generated'],\n      withSampleData: false\n    },\n    slug\n  }\n}];"
+      },
+      "id": "b2717b21-e414-414a-871c-d979ccf13f1a",
+      "name": "Build RR Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8768,
+        2864
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst profile = $input.first().json;\nreturn [{ json: { ...profile, photoBase64:null, photoMimeType:null, photoFilename:null }}];\n"
+      },
+      "id": "76159471-cea5-4b82-87a7-756f2e60e44a",
+      "name": "No Photo (pass-through)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8528,
+        2864
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-photo",
+              "leftValue": "={{ $json.photoEnabled }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f60ef7bc-6231-4f1f-9edd-c9912e7ea103",
+      "name": "Has Photo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        8528,
+        2608
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const res = $input.first().json;\nconst prev = $('Build LLM Call 2 Prompt').item.json;\n\nlet raw = res.textResponse || res.text || res.response || \"\";\nraw = raw.replace(/```json\\n?/gi, \"\").replace(/```\\n?/gi, \"\").trim();\n\nconst fixIncompleteJson = (jsonStr) => {\n    let stack = [];\n    let isInsideString = false;\n    let escaped = false;\n    for (let i = 0; i < jsonStr.length; i++) {\n        let char = jsonStr[i];\n        if (char === '\"' && !escaped) { isInsideString = !isInsideString; }\n        escaped = (char === \"\\\\\" && !escaped);\n        if (!isInsideString) {\n            if (char === '{' || char === '[') stack.push(char);\n            else if (char === '}' || char === ']') stack.pop();\n        }\n    }\n    if (isInsideString) jsonStr += '\"';\n    while (stack.length > 0) {\n        let last = stack.pop();\n        jsonStr += (last === '{' ? '}' : ']');\n    }\n    return jsonStr;\n};\n\nconst match = raw.match(/\\{[\\s\\S]*/);\nif (!match) throw new Error(\"LLM Call 2: No JSON found.\");\n\nlet part2;\ntry {\n    let jsonStr = fixIncompleteJson(match[0]);\n    jsonStr = jsonStr.replace(/\"(\\w+)\\s+\"(?=\\s*[\"{[\\dtf\\-])/g, '\"$1\": ');\n    part2 = JSON.parse(jsonStr);\n} catch (e) {\n    throw new Error(\"LLM Call 2 Parse Error: \" + e.message);\n}\n\nconst p1 = prev.part1;\nconst b = p1.basics || {};\n\nconst basics = {\n    name: b.name || \"\",\n    headline: b.label || b.headline || \"\",\n    email: b.email || \"\",\n    phone: b.phone || \"\",\n    location: [b.location?.city, b.location?.region, b.location?.country].filter(Boolean).join(\", \") || b.location || \"\",\n    website: { url: b.url?.href || \"\", label: b.url?.label || \"\" },\n    customFields: []\n};\n\nconst summary = {\n    title: \"Summary\",\n    columns: 1,\n    hidden: false,\n    content: `<div style=\"font-size: 10pt; font-weight: normal;\">${b.summary || \"\"}</div>`\n};\n\nconst expItems = (p1.experience || []).map(e => ({\n    id: e.id || (\"exp-\" + Math.random().toString(36).slice(2, 7)),\n    hidden: false,\n    company: e.company || \"\",\n    position: e.position || \"\",\n    location: (typeof e.location === 'object' && e.location !== null) \n              ? [e.location.city, e.location.region, e.location.country].filter(Boolean).join(\", \") \n              : (e.location || \"\"),\n    period: e.date || e.period || \"\",\n    website: { url: \"\", label: \"\" },\n    description: (() => {\n        const bullets = Array.isArray(e.summary) ? e.summary : Array.isArray(e.description) ? e.description : null;\n        const text = (bullets && bullets.length) ? (\"<ul>\" + bullets.map(b => \"<li>\" + b + \"</li>\").join(\"\") + \"</ul>\") : (e.summary || e.description || \"\");\n        return `<div style=\"font-size: 10pt; font-weight: normal;\">${text}</div>`;\n    })()\n}));\n\nconst eduItems = (p1.education || []).map(e => ({\n    id: e.id || (\"edu-\" + Math.random().toString(36).slice(2, 7)),\n    hidden: false,\n    school: e.institution || \"\",\n    degree: e.studyType || e.degree || \"\",\n    area: e.area || e.field || \"\",\n    location: e.location || \"\",\n    period: e.date || e.period || \"\",\n    grade: e.score || e.gpa || \"\",\n    description: e.summary || \"\"\n}));\n\nconst skillItems = (part2.skills || []).map(s => ({\n    id: s.id || (\"sk-\" + Math.random().toString(36).slice(2, 7)),\n    hidden: false,\n    name: s.name || \"\",\n    description: s.description || \"\",\n    level: s.level || 3,\n    keywords: s.keywords || [],\n    icon: \"\",\n    proficiency: \"\"\n}));\n\nconst projItems = (part2.projects || []).map(p => ({\n    id: p.id || (\"pr-\" + Math.random().toString(36).slice(2, 7)),\n    hidden: false,\n    name: p.name || \"\",\n    description: `<div style=\"font-size: 10pt; font-weight: normal;\">${p.description || \"\"}</div>`,\n    period: p.date || p.period || \"\",\n    website: { url: p.url?.href || \"\", label: p.url?.label || \"GitHub\" },\n    summary: `<div style=\"font-size: 10pt; font-weight: normal;\">${p.summary || \"\"}</div>`,\n    keywords: p.keywords || []\n}));\n\nconst certItems = (part2.certifications || []).map(c => ({\n    id: c.id || (\"cert-\" + Math.random().toString(36).slice(2, 7)),\n    hidden: false,\n    title: c.name || \"\",\n    issuer: c.issuer || \"\",\n    date: c.date || c.period || \"\",\n    website: { url: c.url?.href || \"\", label: \"\" },\n    description: `<div style=\"font-size: 10pt; font-weight: normal;\">${c.description || \"\"}</div>`\n}));\n\nconst resumeData = {\n    basics,\n    summary,\n    sections: {\n        experience: { title: \"Experience\", columns: 1, hidden: false, items: expItems },\n        education: { title: \"Education\", columns: 1, hidden: false, items: eduItems },\n        skills: { title: \"Skills\", columns: 2, hidden: false, items: skillItems },\n        projects: { title: \"Projects\", columns: 1, hidden: false, items: projItems },\n        certifications: { title: \"Certifications\", columns: 1, hidden: false, items: certItems }\n    }\n};\n\nconst slug = prev.name.replace(/\\s+/g, \"-\").toLowerCase() + \"-\" + Date.now();\n\nreturn [{\n    json: {\n        resumeData,\n        profile: prev,\n        slug,\n        candidateName:   prev.name,\n        candidateTitle:  prev.title,\n        category:        prev.category,\n        photoEnabled:    prev.photoEnabled,\n        gender:          prev.gender,\n        ethnicityPrompt: prev.ethnicityPrompt,\n        ageDesc:         prev.ageDesc,\n        template:        prev.template,\n        theme:           prev.theme,\n        index:           prev.index\n    }\n}];"
+      },
+      "id": "6194295e-5eb7-457e-a227-f3178d47b62d",
+      "name": "Assemble Full Resume",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        10208,
+        2368
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://YOUR_ANYTHINGLLM_URL/api/v1/workspace/resume-generator/chat",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_ANYTHINGLLM_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"message\": {{ JSON.stringify($json.llm2_message) }},\n  \"mode\": \"chat\",\n  \"sessionId\": {{ JSON.stringify($json.llm2_session) }}\n}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "48e1c9cd-7efb-4a4c-a41b-d86c9e050806",
+      "name": "LLM Call 2: Skills + Projects + Certs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        9984,
+        2368
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst p = $input.first().json;\nconst schema = {\n  skills: [\n    { id:\"sk1\", name:\"FILL\", description:\"FILL\", level:4, keywords:[\"FILL\",\"FILL\"], visible:true },\n    { id:\"sk2\", name:\"FILL\", description:\"FILL\", level:4, keywords:[\"FILL\",\"FILL\"], visible:true },\n    { id:\"sk3\", name:\"FILL\", description:\"FILL\", level:3, keywords:[\"FILL\"],        visible:true }\n  ],\n  projects: [\n    { id:\"pr1\", name:\"FILL\", description:\"FILL\", date:\"FILL\", url:{label:\"GitHub\",href:\"https://github.com/FILL/FILL\"}, summary:\"FILL\", keywords:[\"FILL\"], visible:true },\n    { id:\"pr2\", name:\"FILL\", description:\"FILL\", date:\"FILL\", url:{label:\"GitHub\",href:\"https://github.com/FILL/FILL\"}, summary:\"FILL\", keywords:[\"FILL\"], visible:true }\n  ],\n  certifications: [\n    { id:\"cert1\", name:\"FILL\", issuer:\"FILL\", date:\"FILL\", url:{label:\"\",href:\"\"}, summary:\"\", visible:true }\n  ]\n};\nconst message = (\n  \"Output ONLY raw JSON, no markdown, no explanation.\\n\" +\n  \"Generate realistic skills, projects and certifications for: \" + p.name +\n  \", \" + p.title + \", specialty: \" + p.specialty + \".\\n\" +\n  \"Replace every FILL value with realistic content. Return:\\n\" +\n  JSON.stringify(schema)\n);\nreturn [{ json: {\n  ...p,\n  llm2_message: message,\n  llm2_session: \"llm2-\" + p.name.replace(/\\s+/g,\"-\").toLowerCase() + \"-\" + Date.now()\n}}];\n"
+      },
+      "id": "bcf487bb-309e-4346-8020-984df2a65cf9",
+      "name": "Build LLM Call 2 Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        9744,
+        2368
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const res  = $input.first().json;\nconst prev = $('Build LLM Call 1 Prompt').item.json;\n\nlet raw = res.textResponse || res.text || res.response || \"\";\nraw = raw.replace(/```json\\n?/gi, \"\").replace(/```\\n?/gi, \"\").trim();\n\n// \u2500\u2500 JSON repair \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nconst fixIncompleteJson = (jsonStr) => {\n  let stack = [], insideString = false, escaped = false;\n  for (let i = 0; i < jsonStr.length; i++) {\n    const c = jsonStr[i];\n    if (c === '\"' && !escaped) insideString = !insideString;\n    escaped = (c === '\\\\' && !escaped);\n    if (!insideString) {\n      if (c === '{' || c === '[') stack.push(c);\n      else if (c === '}' || c === ']') stack.pop();\n    }\n  }\n  if (insideString) jsonStr += '\"';\n  while (stack.length) jsonStr += stack.pop() === '{' ? '}' : ']';\n  return jsonStr;\n};\n\nconst match = raw.match(/\\{[\\s\\S]*}/);\nif (!match) throw new Error('LLM Call 1: No JSON found for ' + prev.name);\n\nlet part1;\ntry {\n  let jsonStr = fixIncompleteJson(match[0]);\n  jsonStr = jsonStr.replace(/[\\u0000-\\u001F]+/g, ' ');\n  jsonStr = jsonStr.replace(/\"(\\w+)\\s+\"(?=\\s*[\"{[\\dtf\\-])/g, '\"$1\": ');\n  part1 = JSON.parse(jsonStr);\n} catch (e) {\n  throw new Error('LLM Call 1 parse error for ' + prev.name + ': ' + e.message);\n}\n\nif (part1.basics) {\n  part1.basics.name  = prev.name;\n  part1.basics.email = prev.email;\n  part1.basics.phone = prev.phone;\n  part1.basics.label = prev.title;\n}\n\nreturn [{ json: { ...prev, part1 } }];"
+      },
+      "id": "5055156d-44e9-41ac-bf40-71b8f0c6270e",
+      "name": "Parse LLM Call 1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        9504,
+        2368
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://YOUR_ANYTHINGLLM_URL/api/v1/workspace/resume-generator/chat",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_ANYTHINGLLM_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"message\": {{ JSON.stringify($json.llm1_message) }},\n  \"mode\": \"chat\",\n  \"sessionId\": {{ JSON.stringify($json.llm1_session) }}\n}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "226ed62e-12c3-439d-bbdf-66be2f180f76",
+      "name": "LLM Call 1: Basics + Experience + Education",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        9264,
+        2368
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst p = $input.first().json;\nconst schema = {\n  basics: {\n    name: p.name, label: p.title, email: p.email, phone: p.phone,\n    location: { city: \"FILL\", region: \"FILL\", country: \"US\" },\n    summary: \"FILL: 2-sentence keyword-rich summary\",\n    url: { label: \"\", href: \"https://linkedin.com/in/FILL\" }\n  },\n  experience: [\n    { id:\"exp1\", company:\"FILL\", position:\"FILL\", date:\"FILL\", location:\"FILL\", summary:\"FILL: 2 bullet achievements\", visible:true },\n    { id:\"exp2\", company:\"FILL\", position:\"FILL\", date:\"FILL\", location:\"FILL\", summary:\"FILL: 2 bullet achievements\", visible:true }\n  ],\n  education: [\n    { id:\"edu1\", institution:\"FILL\", studyType:\"FILL\", area:\"FILL\", date:\"FILL\", score:\"FILL\", summary:\"\", visible:true }\n  ]\n};\nconst message = (\n  \"Output ONLY raw JSON, no markdown, no explanation.\\n\" +\n  \"Generate realistic resume data for: \" + p.name + \", \" + p.title +\n  \", \" + p.yearsExp + \" yrs exp, specialty: \" + p.specialty +\n  \", location: \" + p.location + \".\\n\" +\n  \"Replace every FILL value with realistic content. Return:\\n\" +\n  JSON.stringify(schema)\n);\nreturn [{ json: {\n  ...p,\n  llm1_message: message,\n  llm1_session: \"llm1-\" + p.name.replace(/\\s+/g,\"-\").toLowerCase() + \"-\" + Date.now()\n}}];\n"
+      },
+      "id": "9000fbe7-f601-4924-9eb5-45c1f906894f",
+      "name": "Build LLM Call 1 Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        9024,
+        2368
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst rand = (arr) => arr[Math.floor(Math.random() * arr.length)];\nconst randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;\n\n// Each group bundles culturally-matched first names, last names,\n// and a prose descriptor fed directly into the ComfyUI prompt.\nconst ethnicGroups = [\n  {\n    id: 'east_asian',\n    promptDesc: 'East Asian',\n    weight: 10,\n    firstNamesM: ['Wei','Ming','Jun','Hao','Lei','Jian','Kenji','Hiroshi','Takeshi','Daisuke','Ren','Sota','Jin','Sung','Hyun','Min','Joon','Tae','Seung','Dong','Yong','Bo','Feng','Cheng','Gang'],\n    firstNamesF: ['Mei','Ling','Xiu','Xia','Fang','Yuki','Sakura','Haruko','Akemi','Emi','Naomi','Ji','Soo','Eun','Hana','Yeon','Min','Jiyeon','Seoyeon','Jisoo','Chaeyeon'],\n    lastNames: ['Chen','Zhang','Liu','Wang','Li','Zhao','Wu','Sun','Huang','Zhou','Yamamoto','Tanaka','Nakamura','Suzuki','Sato','Kobayashi','Ito','Kato','Park','Kim','Lee','Choi','Jung','Han','Yoon']\n  },\n  {\n    id: 'south_asian',\n    promptDesc: 'South Asian Indian',\n    weight: 10,\n    firstNamesM: ['Rahul','Amit','Raj','Vikram','Arjun','Ravi','Sanjay','Nikhil','Arun','Suresh','Deepak','Kiran','Varun','Rohit','Ankit','Pradeep','Manoj','Sachin','Vishal','Ajay'],\n    firstNamesF: ['Priya','Anita','Sunita','Kavya','Pooja','Deepa','Nisha','Divya','Meera','Asha','Rekha','Swati','Geeta','Neha','Anjali','Sneha','Ritu','Pallavi','Sonam','Shruti'],\n    lastNames: ['Patel','Singh','Kumar','Sharma','Gupta','Mehta','Joshi','Rao','Nair','Iyer','Reddy','Shah','Chopra','Verma','Malhotra','Kapoor','Bose','Das','Mishra','Pandey']\n  },\n  {\n    id: 'hispanic_latino',\n    promptDesc: 'Hispanic Latino',\n    weight: 10,\n    firstNamesM: ['Carlos','Miguel','Juan','Jose','Luis','Ricardo','Diego','Alejandro','Fernando','Eduardo','Pablo','Marco','Andres','Sebastian','Rodrigo','Emilio','Javier','Rafael','Hector','Manuel'],\n    firstNamesF: ['Maria','Ana','Sofia','Isabella','Valentina','Gabriela','Camila','Lucia','Elena','Carmen','Adriana','Daniela','Paola','Monica','Natalia','Claudia','Patricia','Rosa','Fernanda','Ver\u00f3nica'],\n    lastNames: ['Garcia','Martinez','Rodriguez','Lopez','Hernandez','Gonzalez','Perez','Sanchez','Ramirez','Torres','Reyes','Cruz','Morales','Ortiz','Jimenez','Moreno','Romero','Alvarez','Gutierrez','Diaz','Vargas','Castro','Ramos','Herrera','Medina','Castillo','Mendoza','Vega','Aguilar','Delgado']\n  },\n  {\n    id: 'black_american',\n    promptDesc: 'Black American',\n    weight: 10,\n    firstNamesM: ['Marcus','Darius','Jamal','Malik','Andre','Terrence','Xavier','Jordan','Darnell','Quincy','DeShawn','Elijah','Isaiah','Nathaniel','Devin','Jalen','Kendall','Kofi','Damien','Aaron'],\n    firstNamesF: ['Keisha','Tanisha','Monique','Imani','Aaliyah','Jasmine','Brianna','Simone','Ebony','Tiffany','Destiny','Kiara','Zora','Ayana','Nia','Amara','Shanice','Latoya','Rochelle','Dominique'],\n    lastNames: ['Jackson','Washington','Jefferson','Williams','Brown','Davis','Johnson','Robinson','Thompson','Carter','Mitchell','Harris','Moore','Walker','Taylor','Thomas','White','Lewis','Green','Young','Scott','Allen','Hall','Adams','Baker','Nelson','Hill','Campbell','Roberts','Evans']\n  },\n  {\n    id: 'black_african',\n    promptDesc: 'Black African',\n    weight: 8,\n    firstNamesM: ['Emeka','Chidi','Obinna','Kwame','Kofi','Seun','Tunde','Bayo','Femi','Ade','Tobi','Yemi','Jide','Gbenga','Nnamdi','Chukwuemeka','Ifeanyi','Oluwaseun','Babatunde','Abdullahi'],\n    firstNamesF: ['Amara','Chidinma','Ngozi','Adaeze','Nneka','Funmi','Yetunde','Bimpe','Temitope','Folake','Shade','Kemi','Sade','Ifeoma','Chiamaka','Obiageli','Oluwakemi','Abimbola','Titilayo','Halima'],\n    lastNames: ['Okafor','Mensah','Diallo','Nwosu','Adeyemi','Osei','Asante','Boateng','Acheampong','Amoah','Owusu','Adjei','Bediako','Nkrumah','Eze','Okeke','Chukwu','Nwachukwu','Adesanya','Babangida']\n  },\n  {\n    id: 'white_american',\n    promptDesc: 'White American',\n    weight: 12,\n    firstNamesM: ['James','Michael','Robert','David','William','Richard','Joseph','Thomas','Charles','Christopher','Daniel','Matthew','Andrew','Ryan','Nathan','Benjamin','Eric','Alexander','Tyler','Logan','Austin','Trevor','Kyle','Cody','Garrett'],\n    firstNamesF: ['Emma','Olivia','Sophia','Charlotte','Amelia','Harper','Evelyn','Hannah','Abigail','Emily','Elizabeth','Mia','Ella','Victoria','Grace','Chloe','Penelope','Madison','Brooklyn','Savannah','Hailey','Alexis','Kayla','Lauren','Brittany'],\n    lastNames: ['Smith','Johnson','Williams','Brown','Jones','Miller','Wilson','Anderson','Thomas','Taylor','Moore','Martin','Thompson','White','Harris','Clark','Lewis','Walker','Young','Allen','King','Wright','Scott','Green','Adams','Nelson','Baker','Hall','Campbell','Mitchell','Carter','Roberts','Phillips','Evans','Turner','Parker','Collins','Edwards','Stewart','Morris']\n  },\n  {\n    id: 'white_european',\n    promptDesc: 'White European',\n    weight: 8,\n    firstNamesM: ['Lars','Henrik','Mikael','Bjorn','Erik','Pieter','Jan','Luca','Marco','Matteo','Pierre','Antoine','Klaus','Stefan','Lukas','Andrei','Dmitri','Pavel','Tom\u00e1\u0161','Marek'],\n    firstNamesF: ['Ingrid','Astrid','Sigrid','Lena','Astrid','Elke','Anke','Giulia','Chiara','Francesca','Camille','Elise','Annika','Petra','Katja','Monika','Irena','Marta','Zuzana','Veronika'],\n    lastNames: ['Johansson','Eriksson','Petersen','Andersen','Larsson','Lindqvist','Berg','Van der Berg','De Vries','M\u00fcller','Schneider','Becker','Fischer','Weber','Meyer','Rossi','Ferrari','Ricci','Martin','Dubois','Bernard','Leroy','Kovacs','Novak','Horv\u00e1th','Popescu','Ionescu','Kowalski','Wozniak','Nowak']\n  },\n  {\n    id: 'middle_eastern',\n    promptDesc: 'Middle Eastern',\n    weight: 7,\n    firstNamesM: ['Omar','Ahmed','Ali','Hassan','Karim','Yusuf','Ibrahim','Tariq','Faisal','Rami','Khalid','Nasser','Samir','Walid','Bassam','Ziad','Amir','Hamid','Mustafa','Adnan'],\n    firstNamesF: ['Fatima','Aisha','Nadia','Leila','Sara','Yasmin','Hana','Dina','Rania','Layla','Maha','Rana','Ghada','Samar','Lama','Alia','Nour','Rim','Amal','Mariam'],\n    lastNames: ['Hassan','Ali','Ahmed','Mohamed','Khalil','Mansour','Nassar','Saleh','Aziz','Karimi','Rashid','Hamdan','Qureshi','Baig','Siddiqui','Chaudhry','Sheikh','Mirza','Nasser','Haddad']\n  },\n  {\n    id: 'southeast_asian',\n    promptDesc: 'Southeast Asian',\n    weight: 8,\n    firstNamesM: ['Minh','Tuan','Bao','Huy','Duc','Rizal','Andres','Jose','Farid','Bayu','Eko','Dian','Budi','Agus','Reza','Ahmad','Nattapong','Krit','Supachai','Somchai'],\n    firstNamesF: ['Linh','Thi','Mai','Huong','Lan','Maria','Ana','Rina','Dewi','Putri','Nurul','Ayu','Sari','Sri','Rattana','Siriporn','Malee','Nong','Fon','Wan'],\n    lastNames: ['Nguyen','Tran','Le','Vo','Pham','Hoang','Dang','Bui','Do','Ly','Santos','Reyes','Cruz','Dela Cruz','Ramos','Wirawan','Santoso','Susanto','Prasetyo','Kurniawan']\n  },\n  {\n    id: 'mixed',\n    promptDesc: 'mixed race multiracial',\n    weight: 5,\n    firstNamesM: ['Jordan','Tyler','Cameron','Alex','Chris','Morgan','Blake','Casey','Quinn','Riley','Sage','River','Phoenix','Skyler','Logan'],\n    firstNamesF: ['Jordan','Taylor','Morgan','Casey','Riley','Avery','Quinn','Hayden','Cameron','Alexis','Sage','Rowan','Brooklyn','Peyton','Reese'],\n    lastNames: ['Johnson','Williams','Brown','Davis','Martinez','Lee','Anderson','Thomas','Jackson','White','Harris','Clark','Walker','Young','Scott','Green','Baker','Nelson','Hall','Rivera']\n  }\n];\n\n// Build weighted pool\nconst pool = [];\nfor (const g of ethnicGroups) {\n  for (let i = 0; i < g.weight; i++) pool.push(g);\n}\n\nconst csSpecialties = [\n  \"Backend & Distributed Systems\",\"Frontend & React/Next.js\",\"Full-Stack Web Development\",\n  \"Machine Learning & Deep Learning\",\"Data Engineering & Pipelines\",\"Cloud Infrastructure & DevOps\",\n  \"Cybersecurity & Penetration Testing\",\"Mobile Development (iOS/Android)\",\"Blockchain & Smart Contracts\",\n  \"Computer Vision & Image Processing\",\"Natural Language Processing\",\"Site Reliability Engineering\",\n  \"Database Architecture & Optimization\",\"API Design & Microservices\",\"Game Development & Graphics\",\n  \"Quantitative Finance & Algo Trading\",\"Robotics Software & ROS\",\"Platform Engineering & Kubernetes\",\n  \"Search & Recommendation Systems\",\"Compiler Design & Programming Languages\"\n];\nconst engSpecialties = [\n  \"C/C++ & RTOS Embedded Systems\",\"FPGA & Digital Logic Design\",\"PCB Design & Hardware Engineering\",\n  \"Signal Processing & DSP\",\"Power Electronics & Motor Control\",\"Automotive Embedded Systems (AUTOSAR)\",\n  \"Telecommunications & RF Engineering\",\"Control Systems & PID\",\"IoT & Sensor Fusion\",\n  \"Mechatronics & Robotics\",\"VLSI & ASIC Design\",\"Aerospace Systems & Avionics\",\n  \"Industrial Automation & PLC\",\"Firmware Development (ARM Cortex)\",\"Wireless Communications (5G/WiFi)\",\n  \"Radar & Sonar Systems\",\"Battery Management Systems\",\"CAN/LIN/SPI/I2C Protocols\",\n  \"Safety-Critical Systems (IEC 61508)\",\"System-on-Chip Design\"\n];\nconst csTitles = [\n  \"Software Engineer\",\"Senior Software Engineer\",\"Staff Engineer\",\"Principal Engineer\",\n  \"Software Architect\",\"Backend Developer\",\"Frontend Developer\",\"Full-Stack Developer\",\n  \"ML Engineer\",\"Data Scientist\",\"Data Engineer\",\"DevOps Engineer\",\n  \"Site Reliability Engineer\",\"Platform Engineer\",\"Security Engineer\",\n  \"Cloud Architect\",\"Mobile Developer\",\"Research Engineer\",\"AI/ML Researcher\",\n  \"Engineering Manager\",\"Tech Lead\",\"Senior Data Scientist\",\"Applied Scientist\",\n  \"Infrastructure Engineer\",\"Solutions Architect\"\n];\nconst engTitles = [\n  \"Embedded Systems Engineer\",\"Firmware Engineer\",\"Hardware Engineer\",\"FPGA Engineer\",\n  \"RF Engineer\",\"Control Systems Engineer\",\"PCB Design Engineer\",\"Electronics Engineer\",\n  \"Systems Engineer\",\"Robotics Engineer\",\"DSP Engineer\",\"Automotive Software Engineer\",\n  \"VLSI Design Engineer\",\"Telecommunications Engineer\",\"IoT Engineer\",\n  \"Mechatronics Engineer\",\"Safety Engineer\",\"Signal Processing Engineer\",\n  \"Avionics Engineer\",\"Power Systems Engineer\",\"Electrical Engineer\",\n  \"Senior Firmware Engineer\",\"Principal Embedded Engineer\",\"Hardware Architect\"\n];\nconst locations = [\n  \"San Francisco, CA\",\"Seattle, WA\",\"Austin, TX\",\"New York, NY\",\"Boston, MA\",\n  \"Denver, CO\",\"Chicago, IL\",\"Los Angeles, CA\",\"San Jose, CA\",\"Raleigh, NC\",\n  \"Atlanta, GA\",\"Portland, OR\",\"San Diego, CA\",\"Dallas, TX\",\"Phoenix, AZ\",\n  \"Minneapolis, MN\",\"Pittsburgh, PA\",\"Columbus, OH\",\"Charlotte, NC\",\"Salt Lake City, UT\",\n  \"Nashville, TN\",\"Baltimore, MD\",\"Washington, DC\",\"Philadelphia, PA\",\"Houston, TX\",\n  \"Tampa, FL\",\"Boise, ID\",\"Miami, FL\",\"Sacramento, CA\",\"Richmond, VA\"\n];\nconst emailDomains = [\n  \"gmail.com\",\"outlook.com\",\"yahoo.com\",\"protonmail.com\",\"icloud.com\",\n  \"hotmail.com\",\"me.com\",\"fastmail.com\"\n];\n\nfunction generateEmail(first, last) {\n  const sep = rand([\".\",  \"_\", \"\"]);\n  const num = Math.random() > 0.6 ? String(randInt(1, 99)) : \"\";\n  const domain = rand(emailDomains);\n  const variants = [\n    `${first.toLowerCase()}${sep}${last.toLowerCase()}${num}`,\n    `${first[0].toLowerCase()}${sep}${last.toLowerCase()}${num}`,\n    `${first.toLowerCase()}${sep}${last[0].toLowerCase()}${num}`\n  ];\n  return `${rand(variants)}@${domain}`;\n}\n\nfunction ageDesc(yrs) {\n  if (yrs <= 3)  return `late 20s`;\n  if (yrs <= 7)  return `early 30s`;\n  if (yrs <= 12) return `late 30s`;\n  if (yrs <= 17) return `mid 40s`;\n  return `early 50s`;\n}\n\nconst count = 2;\nconst results = [];\nconst usedNames = new Set();\n\nfor (let i = 0; i < count; i++) {\n  let group, gender, firstName, lastName, name;\n  let attempts = 0;\n  do {\n    group     = rand(pool);\n    gender    = rand([\"male\",\"female\"]);\n    firstName = gender === \"female\" ? rand(group.firstNamesF) : rand(group.firstNamesM);\n    lastName  = rand(group.lastNames);\n    name      = `${firstName} ${lastName}`;\n    attempts++;\n  } while (usedNames.has(name) && attempts < 30);\n  usedNames.add(name);\n\n  const category  = Math.random() < 0.55 ? \"CS\" : \"Engineering\";\n  const specialty = category === \"CS\" ? rand(csSpecialties) : rand(engSpecialties);\n  const title     = category === \"CS\" ? rand(csTitles)      : rand(engTitles);\n  const yearsExp  = category === \"CS\" ? randInt(1, 16) : randInt(2, 20);\n  const location  = rand(locations);\n  const email     = generateEmail(firstName, lastName);\n  const phone     = `+1-${randInt(201,999)}-${randInt(200,999)}-${randInt(1000,9999)}`;\n\n  const rrTemplates = [\n    'azurill','bronzor','chikorita','ditgar','ditto','gengar','glalie',\n    'kakuna','leafish','nosepass','onyx','pikachu','rhyhorn','meowth'\n  ];\n  const palettes = [\n    'rgba(26, 86, 219, 1)', // Blue\n    'rgba(14, 159, 110, 1)', // Emerald\n    'rgba(126, 58, 242, 1)', // Violet\n    'rgba(227, 160, 8, 1)', // Amber\n    'rgba(224, 36, 36, 1)', // Crimson\n    'rgba(8, 145, 178, 1)', // Cyan\n    'rgba(214, 31, 105, 1)', // Rose\n    'rgba(5, 122, 85, 1)', // Forest Green\n    'rgba(104, 117, 245, 1)', // Indigo\n    'rgba(255, 90, 31, 1)', // Burnt Orange\n    'rgba(28, 100, 242, 1)', // Sapphire\n    'rgba(4, 116, 129, 1)', // Teal\n    'rgba(85, 33, 181, 1)', // Deep Purple\n    'rgba(180, 52, 3, 1)', // Rust\n    'rgba(30, 66, 159, 1)', // Navy\n    'rgba(159, 18, 57, 1)', // Ruby\n    'rgba(180, 83, 9, 1)', // Gold\n    'rgba(3, 105, 161, 1)', // Sky Blue\n    'rgba(15, 118, 110, 1)', // Dark Teal\n    'rgba(124, 58, 237, 1)', // Purple\n    'rgba(194, 65, 12, 1)', // Deep Orange\n    'rgba(2, 132, 199, 1)', // Light Blue\n    'rgba(22, 163, 74, 1)', // Green\n    'rgba(220, 38, 38, 1)', // Red\n    'rgba(147, 51, 234, 1)', // Fuchsia\n  ];\n  // Use Date.now() + index so each candidate gets a different slot AND\n  // every workflow run lands on a different position in the list.\n  // 137 and 97 are primes \u2014 good spread across list lengths 13 and 20.\n  const template = rrTemplates[ (Math.floor(Date.now() / 10) + i * 137) % rrTemplates.length ];\n  const primary   = palettes[    (Math.floor(Date.now() / 10) + i * 97)  % palettes.length    ];\n  const theme     = { primary, text: 'rgba(0, 0, 0, 1)', background: 'rgba(255, 255, 255, 1)' };\n  const photoEnabled = Math.random() < 0.75; // 75 % get a headshot\n\n  results.push({ json: {\n    name, firstName, lastName, gender,\n    ethnicityId:     group.id,\n    ethnicityPrompt: group.promptDesc,\n    ageDesc:         ageDesc(yearsExp),\n    template, theme,\n    title, email, phone, location, specialty, yearsExp, category,\n    photoEnabled, index: i\n  }});\n}\n\nreturn results;\n"
+      },
+      "id": "7dec1fc7-ded6-45ac-a2a3-b7b0d61189e1",
+      "name": "Define 2 Candidate Profiles",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8784,
+        2368
+      ]
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        8544,
+        2368
+      ],
+      "id": "84be3535-b901-4810-a719-ca958c5a26e6",
+      "name": "Execute Workflow"
+    },
+    {
+      "parameters": {
+        "content": "## JeroPC Local Setup + Jero Accounts \u2014 v4\n**AnythingLLM**\n- Base URL: http://YOUR_ANYTHINGLLM_URL\n- AuthAPI Key: YOUR_ANYTHINGLLM_API_KEY\n- Endpoint: /api/v1/workspace/resume-generator/chat\n- Model: Meta-Llama-3.1-8B-Instruct-Q8_0\n\n**ComfyUI**\n- API URL: http://YOUR_COMFYUI_URL\n- Image model: z_image_turbo_bf16.safetensors\n\n**Reactive Resume**\n- API URL: https://rxresu.me/api/openapi\n- x-api-key: YOUR_REACTIVE_RESUME_API_KEY\n- Schema: v5 (current cloud)\n\n**Gdrive**\n- Client ID: YOUR_GOOGLE_CLIENT_ID\n- Client secret: YOUR_GOOGLE_CLIENT_SECRET\n- My Drive/Resume Dataset/CS: https://drive.google.com/drive/u/0/folders/YOUR_CS_DRIVE_FOLDER_ID\n- My Drive/Resume Dataset/Engineering: https://drive.google.com/drive/u/0/folders/YOUR_ENGINEERING_DRIVE_FOLDER_ID",
+        "height": 492,
+        "width": 880
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        8560,
+        1808
+      ],
+      "id": "1d1f5564-8ce0-497e-b730-3c79112f9834",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "amount": 150
+      },
+      "id": "e7ce6965-9abb-45e4-b29d-48208f953376",
+      "name": "Wait 150s for Image",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        9008,
+        2592
+      ],
+      "webhookId": "2cbc1d34-3fc9-4201-ab32-6f03e6392257"
+    },
+    {
+      "parameters": {
+        "inputDataFieldName": "imageBinary",
+        "name": "={{ $('Parse ComfyUI History').item.json.candidateName.replace(/[^a-zA-Z0-9_-]/g, '_') }}_headshot.jpg",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "MyDrive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $('Parse ComfyUI History').item.json.category && $('Parse ComfyUI History').item.json.category.toUpperCase().startsWith('CS') ? 'YOUR_CS_DRIVE_FOLDER_ID' : 'YOUR_ENGINEERING_DRIVE_FOLDER_ID' }}",
+          "mode": "list"
+        },
+        "options": {}
+      },
+      "id": "cc8446ab-92e8-4e7e-b2bf-d0e3b4d3a765",
+      "name": "Drive: Upload Headshot",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        9984,
+        2592
+      ],
+      "alwaysOutputData": false,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "AOBq35YAnonFywPD",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://www.googleapis.com/drive/v3/files/{{ $json.id }}/permissions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"role\": \"reader\", \"type\": \"anyone\"}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "54e1fa4d-2cf2-4f86-a96c-cb94babde1bb",
+      "name": "HTTP: Make Headshot Public",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        10224,
+        2592
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "AOBq35YAnonFywPD",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\n// Re-attach full resume profile (lost after HTTP binary download)\nconst profile = $('Assemble Full Resume').item.json;\n\n// Get the Drive file ID from the upload step\nconst driveFile = $('Drive: Upload Headshot').item.json;\nconst fileId = driveFile.id;\n\nif (!fileId) {\n  throw new Error('Drive upload did not return a file ID: ' + JSON.stringify(driveFile));\n}\n\n// lh3.googleusercontent.com serves public Drive images directly (no redirect)\nconst photoUrl = `https://lh3.googleusercontent.com/d/${fileId}`;\n\nreturn [{\n  json: {\n    ...profile,\n    photoUrl,\n    photoMimeType: 'image/jpeg',\n    driveImageFileId: fileId\n  }\n}];\n"
+      },
+      "id": "6a0a5163-4e83-43f8-8329-468e9dfceeda",
+      "name": "Build Image URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        10432,
+        2592
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "HTTP: Download ComfyUI Image": {
+      "main": [
+        [
+          {
+            "node": "Drive: Upload Headshot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse ComfyUI History": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Download ComfyUI Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Get ComfyUI History": {
+      "main": [
+        [
+          {
+            "node": "Parse ComfyUI History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ComfyUI: Generate Headshot": {
+      "main": [
+        [
+          {
+            "node": "Wait 150s for Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep for Drive": {
+      "main": [
+        [
+          {
+            "node": "Drive: Upload PDF",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Drive: Upload JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Download PDF": {
+      "main": [
+        [
+          {
+            "node": "Prep for Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RR: Export PDF": {
+      "main": [
+        [
+          {
+            "node": "Prep for Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 15s (printer)": {
+      "main": [
+        [
+          {
+            "node": "RR: Export PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RR: Patch Data": {
+      "main": [
+        [
+          {
+            "node": "Wait 15s (printer)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Create + Build Patch": {
+      "main": [
+        [
+          {
+            "node": "RR: Patch Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RR: Create Resume": {
+      "main": [
+        [
+          {
+            "node": "Parse Create + Build Patch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build RR Payload": {
+      "main": [
+        [
+          {
+            "node": "RR: Create Resume",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Photo (pass-through)": {
+      "main": [
+        [
+          {
+            "node": "Build RR Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Photo?": {
+      "main": [
+        [
+          {
+            "node": "ComfyUI: Generate Headshot",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Photo (pass-through)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assemble Full Resume": {
+      "main": [
+        [
+          {
+            "node": "Has Photo?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Call 2: Skills + Projects + Certs": {
+      "main": [
+        [
+          {
+            "node": "Assemble Full Resume",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build LLM Call 2 Prompt": {
+      "main": [
+        [
+          {
+            "node": "LLM Call 2: Skills + Projects + Certs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse LLM Call 1": {
+      "main": [
+        [
+          {
+            "node": "Build LLM Call 2 Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Call 1: Basics + Experience + Education": {
+      "main": [
+        [
+          {
+            "node": "Parse LLM Call 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build LLM Call 1 Prompt": {
+      "main": [
+        [
+          {
+            "node": "LLM Call 1: Basics + Experience + Education",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Define 2 Candidate Profiles": {
+      "main": [
+        [
+          {
+            "node": "Build LLM Call 1 Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Workflow": {
+      "main": [
+        [
+          {
+            "node": "Define 2 Candidate Profiles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 150s for Image": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Get ComfyUI History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive: Upload Headshot": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Make Headshot Public",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Make Headshot Public": {
+      "main": [
+        [
+          {
+            "node": "Build Image URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Image URL": {
+      "main": [
+        [
+          {
+            "node": "Build RR Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "817b40b2-b0b5-434a-baff-ab1922c389d0",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a9923adedf64fe4116624030b14544458eb0aa8c05110597c54588b0b20299b2"
+  },
+  "id": "ieAnta8szgbMNNyZ",
+  "tags": [
+    {
+      "updatedAt": "2026-05-06T13:33:15.260Z",
+      "createdAt": "2026-05-06T13:33:15.260Z",
+      "id": "0rua6MZ7k8y5I0DF",
+      "name": "resume-generation"
+    },
+    {
+      "updatedAt": "2026-05-06T13:33:15.215Z",
+      "createdAt": "2026-05-06T13:33:15.215Z",
+      "id": "4uDj2EwT9hpGtjFE",
+      "name": "google-drive"
+    },
+    {
+      "updatedAt": "2026-05-07T00:53:23.566Z",
+      "createdAt": "2026-05-07T00:53:23.566Z",
+      "id": "NZTwnmwSnCnphFQW",
+      "name": "comfyui"
+    },
+    {
+      "updatedAt": "2026-05-06T13:33:15.266Z",
+      "createdAt": "2026-05-06T13:33:15.266Z",
+      "id": "kMcbnxGxhxOTJNF7",
+      "name": "ai-pipeline"
+    }
+  ]
+}
